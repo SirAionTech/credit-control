@@ -1,4 +1,5 @@
 # Copyright 2016-2018 Tecnativa - Carlos Dauden
+# Copyright 2024 Simone Rubino - Aion Tech
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from odoo import _, fields, models
@@ -31,8 +32,22 @@ class PartnerRiskExceededWiz(models.TransientModel):
             "target": "new",
         }
 
+    def _post_account_move_confirm_risk(self, account_move):
+        """Perform actions when risk is confirmed for the Journal Entry `account_move`.
+
+        By default, this sends the email template configured in the company.
+        Override as needed.
+        """
+        template = account_move.company_id.account_move_confirm_risk_template_id
+        if template:
+            template.send_mail(account_move.id)
+
     def button_continue(self):
         self.ensure_one()
-        return getattr(
-            self.origin_reference.with_context(bypass_risk=True), self.continue_method
+        origin_record = self.origin_reference
+        continue_result = getattr(
+            origin_record.with_context(bypass_risk=True), self.continue_method
         )()
+        if origin_record._name == "account.move":
+            self._post_account_move_confirm_risk(origin_record)
+        return continue_result
